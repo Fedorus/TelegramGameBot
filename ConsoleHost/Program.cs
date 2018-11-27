@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using GameLibrary;
 using Microsoft.Extensions.Configuration;
 using Telegram.Bot;
@@ -9,6 +10,7 @@ namespace ConsoleHost
     {
         static void Main(string[] args)
         {
+            GetTypeT<Stream>();
             var config = new ConfigurationBuilder()
     #if DEBUG
             .AddJsonFile("settings.Debug.json")
@@ -17,8 +19,17 @@ namespace ConsoleHost
     #endif
                 .Build();
             
-            var server = new Server(new TelegramBotClient(config["Key"]), null).Start();
+            var server = new Server(new TelegramBotClient(config["Key"]), config["DBKey"]).Start();
             Console.ReadKey();
         }
+
+        public static void GetTypeT<T>() where T : IDisposable
+        {
+            Console.WriteLine(typeof(T));
+        }
+    }
+    public class Custom<T>  where T : IDisposable
+    {
+		
     }
 }

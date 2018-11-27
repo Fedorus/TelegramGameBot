@@ -11,11 +11,11 @@ namespace GameLibrary
     {
         private readonly TelegramBotClient _client;
         private readonly List<Controller> _controllers = new List<Controller>();
-        private readonly List<Player> _players;
-        public Server(TelegramBotClient client, Database db)
+        private readonly Database _db;
+        public Server(TelegramBotClient client, string MongoConnectionString)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
-            _players = db?.Players ?? new List<Player>();
+            _db = new Database(MongoConnectionString);
         }
 
         public Server AddController(params Controller[] controllers)
@@ -56,7 +56,7 @@ namespace GameLibrary
 
         private async void ClientOnOnCallbackQuery(object sender, CallbackQueryEventArgs e)
         {
-            var player = _players.Find(x => x.Id == e.CallbackQuery.Message.From.Id) ?? await RegisterPlayer(e.CallbackQuery.From);
+            var player = _db.GetPlayer(e.CallbackQuery.Message.From.Id) ?? await RegisterPlayer(e.CallbackQuery.From);
             Console.WriteLine(e.CallbackQuery.Data);
             var commandResult = new CommandResult();
             foreach (var command in _controllers)
@@ -70,7 +70,7 @@ namespace GameLibrary
 
         private async void ClientOnOnMessage(object sender, MessageEventArgs e)
         {
-            var player = _players.Find(x => x.Id == e.Message.From.Id) ?? await RegisterPlayer(e.Message.From);
+            var player =  _db.GetPlayer(e.Message.From.Id) ?? await RegisterPlayer(e.Message.From);
             Console.WriteLine(e.Message.Text);
             var commandResult = new CommandResult();
             foreach (var command in _controllers)
@@ -84,10 +84,9 @@ namespace GameLibrary
 
         private async Task<Player> RegisterPlayer(User messageFrom)
         {
-            var player = new Player {Id = messageFrom.Id};
+            var player = _db.AddPlayer(messageFrom.Id);
             Console.WriteLine($"Registered: {player.Id.ToString()}");
             await _client.SendTextMessageAsync(messageFrom.Id, "You have successfully registered!");
-            _players.Add(player);
             return player;
         }
 
