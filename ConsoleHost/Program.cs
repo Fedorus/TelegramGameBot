@@ -22,14 +22,5 @@ namespace ConsoleHost
             var server = new Server(new TelegramBotClient(config["Key"]), config["DBKey"]).Start();
             Console.ReadKey();
         }
-
-        public static void GetTypeT<T>() where T : IDisposable
-        {
-            Console.WriteLine(typeof(T));
-        }
-    }
-    public class Custom<T>  where T : IDisposable
-    {
-		
     }
 }
