@@ -10,7 +10,6 @@ namespace ConsoleHost
     {
         static void Main(string[] args)
         {
-            GetTypeT<Stream>();
             var config = new ConfigurationBuilder()
     #if DEBUG
             .AddJsonFile("settings.Debug.json")
