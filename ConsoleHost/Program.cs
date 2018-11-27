@@ -1,5 +1,6 @@
 ﻿using System;
 using GameLibrary;
+using Microsoft.Extensions.Configuration;
 using Telegram.Bot;
 
 namespace ConsoleHost
@@ -8,8 +9,15 @@ namespace ConsoleHost
     {
         static void Main(string[] args)
         {
-            var server = new Server(new TelegramBotClient("434659716:AAEoZ-9s0c5n6s_7GWVGQJbzDsCS5RobPGM"), null).Start();
-            Console.WriteLine("Hello World!");
+            var config = new ConfigurationBuilder()
+    #if DEBUG
+            .AddJsonFile("settings.Debug.json")
+    #else
+                .AddJsonFile("settings.json")
+    #endif
+                .Build();
+            
+            var server = new Server(new TelegramBotClient(config["Key"]), null).Start();
             Console.ReadKey();
         }
     }

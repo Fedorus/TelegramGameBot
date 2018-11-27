@@ -13,4 +13,13 @@
       <ProjectReference Include="..\GameLibrary\GameLibrary.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="settings.Debug.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="settings.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>

@@ -57,6 +57,7 @@ namespace GameLibrary
         private async void ClientOnOnCallbackQuery(object sender, CallbackQueryEventArgs e)
         {
             var player = _players.Find(x => x.Id == e.CallbackQuery.Message.From.Id) ?? await RegisterPlayer(e.CallbackQuery.From);
+            Console.WriteLine(e.CallbackQuery.Data);
             var commandResult = new CommandResult();
             foreach (var command in _controllers)
             {
@@ -65,12 +66,12 @@ namespace GameLibrary
                     await command.ProceedCallbackAsync(e.CallbackQuery, player, commandResult);
                 }
             }
-            Console.WriteLine(e.CallbackQuery.Data);
         }
 
         private async void ClientOnOnMessage(object sender, MessageEventArgs e)
         {
             var player = _players.Find(x => x.Id == e.Message.From.Id) ?? await RegisterPlayer(e.Message.From);
+            Console.WriteLine(e.Message.Text);
             var commandResult = new CommandResult();
             foreach (var command in _controllers)
             {
@@ -79,14 +80,13 @@ namespace GameLibrary
                    await command.ProceedMessageAsync(e.Message, player, commandResult);
                 }
             }
-            Console.WriteLine(e.Message.Text);
         }
 
         private async Task<Player> RegisterPlayer(User messageFrom)
         {
             var player = new Player {Id = messageFrom.Id};
             Console.WriteLine($"Registered: {player.Id.ToString()}");
-            await _client.SendTextMessageAsync("", );
+            await _client.SendTextMessageAsync(messageFrom.Id, "You have successfully registered!");
             _players.Add(player);
             return player;
         }
@@ -95,6 +95,7 @@ namespace GameLibrary
         {
             Subscribe();
             _client.StartReceiving();
+            Console.WriteLine("Started!");
             return this;
         }
     }
