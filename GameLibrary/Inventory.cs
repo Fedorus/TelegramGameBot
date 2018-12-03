@@ -1,51 +1,101 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
 namespace GameLibrary
 {
-    public class Inventory
+    public class Inventory<T> : IList<T>
     {
+        private IList<T> Items;
         private const int BasicSize = 20;
-        private readonly List<Item> Items;
         public int Size { get; private set; }
+
+        public int ChangeSize(int newSize)
+        {
+            Size = newSize;
+            return Size;
+        }
+
+        private Inventory()
+        {
+        }
+
+        public Inventory(IList<T> old)
+        {
+            Items = old;
+        }
 
         public Inventory(int size = BasicSize)
         {
-            Items = new List<Item>(size);
             Size = size;
+            Items = new List<T>(Size);
+        }
+        public IEnumerator<T> GetEnumerator()
+        {
+            return Items.GetEnumerator();
         }
 
-        public Item Add(Item item)
+        IEnumerator IEnumerable.GetEnumerator()
         {
-            if (Items.Count >= Size) return null;
+            return ((IEnumerable) Items).GetEnumerator();
+        }
+
+        public void Add(T item)
+        {
+            if (Items.Count >= Size) throw new IndexOutOfRangeException("Рюкзак полон =(");
             Items.Add(item);
-            return item;
         }
 
-        public Item Remove(Item item)
+        private void Add(IList<T> items)
         {
-            var deleted = Items.First(x => x.Name == item.Name) ?? throw new ArgumentNullException("Items.First(x => x.Name == item.Name)");
-            Items.Remove(deleted);
-            return deleted;
+            Items = items;
         }
 
-        public ImmutableArray<Item> GetItems()
+        public void Clear()
         {
-            return Items.AsReadOnly().ToImmutableArray();
+            Items.Clear();
         }
 
-        internal void ChangeSize(int newSize)
+        public bool Contains(T item)
         {
-            Size = newSize;
+            return Items.Contains(item);
         }
-    }
 
-    public class Item
-    {
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public double Cost { get; set; }
+        public void CopyTo(T[] array, int arrayIndex)
+        {
+            Items.CopyTo(array, arrayIndex);
+        }
+
+        public bool Remove(T item)
+        {
+            return Items.Remove(item);
+        }
+
+        public int Count => Items.Count;
+
+        public bool IsReadOnly => Items.IsReadOnly;
+
+        public int IndexOf(T item)
+        {
+            return Items.IndexOf(item);
+        }
+
+        public void Insert(int index, T item)
+        {
+            Items.Insert(index, item);
+        }
+
+        public void RemoveAt(int index)
+        {
+            Items.RemoveAt(index);
+        }
+
+        public T this[int index]
+        {
+            get => Items[index];
+            set => Items[index] = value;
+        }
     }
 }

@@ -1,3 +1,4 @@
 {
-  "Key" : "Telegram bot API key"
+  "Key" : "Telegram bot API key",
+  "DBKey" : "MongoDB connection string"
 }

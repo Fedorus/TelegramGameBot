@@ -1,9 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
+using GameLibrary.Helpers;
 using Telegram.Bot;
 using Telegram.Bot.Args;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.InputFiles;
+using Telegram.Bot.Types.ReplyMarkups;
+using File = Telegram.Bot.Types.File;
 
 namespace GameLibrary
 {
@@ -18,7 +25,7 @@ namespace GameLibrary
             _db = new Database(MongoConnectionString);
         }
 
-        public Server AddController(params Controller[] controllers)
+        public Server Add(params Controller[] controllers)
         {
             _controllers.AddRange(controllers);
             return this;
@@ -56,7 +63,8 @@ namespace GameLibrary
 
         private async void ClientOnOnCallbackQuery(object sender, CallbackQueryEventArgs e)
         {
-            var player = _db.GetPlayer(e.CallbackQuery.Message.From.Id) ?? await RegisterPlayer(e.CallbackQuery.From);
+            _db.LogMessage(e.CallbackQuery);
+            var player = await GetPlayer( e.CallbackQuery.From);
             Console.WriteLine(e.CallbackQuery.Data);
             var commandResult = new CommandResult();
             foreach (var command in _controllers)
@@ -66,11 +74,14 @@ namespace GameLibrary
                     await command.ProceedCallbackAsync(e.CallbackQuery, player, commandResult);
                 }
             }
+            _db.UpdatePlayer(player);
+            HandleResponse(commandResult, e.CallbackQuery.From.Id);
         }
 
         private async void ClientOnOnMessage(object sender, MessageEventArgs e)
         {
-            var player =  _db.GetPlayer(e.Message.From.Id) ?? await RegisterPlayer(e.Message.From);
+            _db.LogMessage(e.Message);
+            var player = await GetPlayer(e.Message.From);
             Console.WriteLine(e.Message.Text);
             var commandResult = new CommandResult();
             foreach (var command in _controllers)
@@ -80,14 +91,61 @@ namespace GameLibrary
                    await command.ProceedMessageAsync(e.Message, player, commandResult);
                 }
             }
+            _db.UpdatePlayer(player);
+            HandleResponse(commandResult, e.Message.From.Id);
+        }
+
+        private async Task HandleResponse(CommandResult commandResult, int chat)
+        {
+            switch (commandResult.Type)
+            {
+                 case MessageType.Photo:
+                     if (commandResult.AdditionalData is string)
+                     {
+                         await _client.SendPhotoAsync(chat, new InputOnlineFile((string) commandResult.AdditionalData),
+                             commandResult.Text.ToString(), ParseMode.Html,
+                             replyMarkup: new InlineKeyboardMarkup(commandResult.Buttons.SplitList()));
+                     }
+                     else if (commandResult.AdditionalData is Stream)
+                     {
+                         await _client.SendPhotoAsync(chat, new InputOnlineFile((Stream) commandResult.AdditionalData),
+                             commandResult.Text.ToString(), ParseMode.Html,
+                             replyMarkup: new InlineKeyboardMarkup(commandResult.Buttons.SplitList()));
+                     }
+                     break;
+                 case MessageType.Text:
+                     default:
+                     await _client.SendTextMessageAsync(chat, commandResult.Text.ToString(),
+                         replyMarkup: new InlineKeyboardMarkup(commandResult.Buttons.SplitList()), parseMode: ParseMode.Html);
+                     break;
+                     
+            }
         }
 
         private async Task<Player> RegisterPlayer(User messageFrom)
         {
-            var player = _db.AddPlayer(messageFrom.Id);
+            var player = _db.AddPlayer(messageFrom);
             Console.WriteLine($"Registered: {player.Id.ToString()}");
             await _client.SendTextMessageAsync(messageFrom.Id, "You have successfully registered!");
             return player;
+        }
+
+        private async Task<Player> GetPlayer(User user)
+        {
+            var player = _db.GetPlayer(user) ?? await RegisterPlayer(user);
+            player.OnLvlUp += PlayerOnOnLvlUp;
+            return player;
+        }
+
+        private void PlayerOnOnLvlUp(Player player)
+        {
+            //using (var file = System.IO.File.OpenRead("Photo/lvlup.png"))
+            {
+                this._client.SendPhotoAsync(player.Id,
+                    new InputMedia(
+                        "https://vignette.wikia.nocookie.net/roblox/images/9/9b/Level_Up_Logo.png/revision/latest?cb=20171101220707"),
+                    caption: $"LVL UP! Новый уровень - {player.Lvl.ToString()}!");
+            }
         }
 
         public Server Start()
