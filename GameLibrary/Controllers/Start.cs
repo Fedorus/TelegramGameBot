@@ -14,7 +14,7 @@ namespace GameLibrary.Controllers
         public async override Task<CommandResult> ProceedMessageAsync(Message eMessage, Player player, CommandResult commandResult)
         {
             commandResult.Text.AppendLine("Вы очутились на поляне посреди леса. Почему???");
-            commandResult.Buttons.Add(new InlineKeyboardButton(){ Text = "Home", CallbackData = "/home"});
+            commandResult.Buttons.Add(new InlineKeyboardButton("Home"){CallbackData = "/home"});
             return commandResult;
         }
 

@@ -19,19 +19,22 @@ namespace GameLibrary.Controllers
             {
                 commandResult.Text.AppendLine(
                     "Блин, стрёмно чёт, погуляю пока по полянке, может найду что...");
-                commandResult.Buttons.Add(new InlineKeyboardButton(){Text = "Обыскать поляну", CallbackData = "/meadow_search"});
+                commandResult.Buttons.Add(new InlineKeyboardButton("Обыскать поляну")
+                    {CallbackData = "/meadow_search"});
             }
             if (player.Lvl > 2 && player.Lvl < 8) // Приключения в лесу
             {
                 commandResult.Text.AppendLine(
                     "Может по краю леса пройти? Ну, я же храбный... наверно...");
-                commandResult.Buttons.Add(new InlineKeyboardButton(){Text = "Походить по лесу", CallbackData = "/forest_search"});
+                commandResult.Buttons.Add(
+                    new InlineKeyboardButton("Походить по лесу") {CallbackData = "/forest_search"});
             }
 
             if (player.Lvl >= 5)
             {
                 commandResult.Text.AppendLine("Кажется я достаточно прокачался что бы зайти в лес подальше.");
-                commandResult.Buttons.Add(new InlineKeyboardButton(){Text = "Углубиться в лес", CallbackData = "/forest_deep_search"});
+                commandResult.Buttons.Add(new InlineKeyboardButton("Углубиться в лес")
+                    {CallbackData = "/forest_deep_search"});
             }
             return commandResult;
         }

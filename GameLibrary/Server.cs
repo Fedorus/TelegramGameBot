@@ -1,25 +1,25 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using GameLibrary.Helpers;
 using Telegram.Bot;
-using Telegram.Bot.Args;
+using Telegram.Bot.Exceptions;
+using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.InputFiles;
 using Telegram.Bot.Types.ReplyMarkups;
-using File = Telegram.Bot.Types.File;
 
 namespace GameLibrary
 {
     public class Server
     {
-        private readonly TelegramBotClient _client;
+        private readonly ITelegramBotClient _client;
         private readonly List<Controller> _controllers = new List<Controller>();
         private readonly Database _db;
-        public Server(TelegramBotClient client, string MongoConnectionString)
+        public Server(ITelegramBotClient client, string MongoConnectionString)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _db = new Database(MongoConnectionString);
@@ -31,94 +31,135 @@ namespace GameLibrary
             return this;
         }
 
-        private void Subscribe()
+        private async Task HandleUpdateAsync(ITelegramBotClient client, Update update, CancellationToken cancellationToken)
         {
-            _client.OnMessage += ClientOnOnMessage;
-            _client.OnCallbackQuery += ClientOnOnCallbackQuery;
-            _client.OnInlineQuery += ClientOnOnInlineQuery;
-            _client.OnReceiveError += ClientOnOnReceiveError;
-            _client.OnInlineResultChosen += ClientOnOnInlineResultChosen;
-            _client.OnMessageEdited += ClientOnOnMessageEdited;
+            switch (update.Type)
+            {
+                case UpdateType.Unknown:
+                    break;
+                case UpdateType.Message:
+                    await OnMessage(update.Message, cancellationToken);
+                    break;
+                case UpdateType.InlineQuery:
+                    Console.WriteLine(update.InlineQuery?.Query);
+                    break;
+                case UpdateType.ChosenInlineResult:
+                    Console.WriteLine(update.ChosenInlineResult?.Query);
+                    break;
+                case UpdateType.CallbackQuery:
+                    await OnCallbackQuery(update.CallbackQuery, cancellationToken);
+                    break;
+                case UpdateType.EditedMessage:
+                    Console.WriteLine(update.Message?.Text);
+                    break;
+                case UpdateType.ChannelPost:
+                    break;
+                case UpdateType.EditedChannelPost:
+                    break;
+                case UpdateType.ShippingQuery:
+                    break;
+                case UpdateType.PreCheckoutQuery:
+                    break;
+                case UpdateType.Poll:
+                    break;
+                case UpdateType.PollAnswer:
+                    break;
+                case UpdateType.MyChatMember:
+                    break;
+                case UpdateType.ChatMember:
+                    break;
+                case UpdateType.ChatJoinRequest:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+        
+        private static Task HandlePollingErrorAsync(ITelegramBotClient client, Exception exception, CancellationToken cancellationToken)
+        {
+            var errorMessage = exception switch
+            {
+                ApiRequestException apiRequestException =>
+                    $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
+                _ => exception.ToString()
+            };
+
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(errorMessage);
+            Console.ResetColor();
+            
+            return Task.CompletedTask;
         }
 
-        private void ClientOnOnMessageEdited(object sender, MessageEventArgs e)
+        private async Task OnCallbackQuery(CallbackQuery callbackQuery, CancellationToken cancellationToken)
         {
-            Console.WriteLine(e.Message.Text);
-        }
-
-        private void ClientOnOnInlineResultChosen(object sender, ChosenInlineResultEventArgs e)
-        {
-            Console.WriteLine(e.ChosenInlineResult);
-        }
-
-        private void ClientOnOnReceiveError(object sender, ReceiveErrorEventArgs e)
-        {
-            Console.WriteLine(e.ApiRequestException);
-        }
-
-        private void ClientOnOnInlineQuery(object sender, InlineQueryEventArgs e)
-        {
-            Console.WriteLine(e.InlineQuery);
-        }
-
-        private async void ClientOnOnCallbackQuery(object sender, CallbackQueryEventArgs e)
-        {
-            _db.LogMessage(e.CallbackQuery);
-            var player = await GetPlayer( e.CallbackQuery.From);
-            Console.WriteLine(e.CallbackQuery.Data);
+            if (callbackQuery == null)
+                return;
+            
+            _db.LogMessage(callbackQuery);
+            var player = await GetPlayer(callbackQuery.From);
+            Console.WriteLine(callbackQuery.Data);
             var commandResult = new CommandResult();
             foreach (var command in _controllers)
             {
-                if (command.CheckCallback(e.CallbackQuery, player))
+                if (command.CheckCallback(callbackQuery, player))
                 {
-                    await command.ProceedCallbackAsync(e.CallbackQuery, player, commandResult);
+                    await command.ProceedCallbackAsync(callbackQuery, player, commandResult);
                 }
             }
-            _db.UpdatePlayer(player);
-            HandleResponse(commandResult, e.CallbackQuery.From.Id);
+            await _db.UpdatePlayer(player, cancellationToken);
+            await HandleResponse(commandResult, callbackQuery.From.Id, cancellationToken);
         }
 
-        private async void ClientOnOnMessage(object sender, MessageEventArgs e)
+        private async Task OnMessage(Message message, CancellationToken cancellationToken)
         {
-            _db.LogMessage(e.Message);
-            var player = await GetPlayer(e.Message.From);
-            Console.WriteLine(e.Message.Text);
+            if (message?.From == null)
+                return;
+            
+            await _db.LogMessage(message, cancellationToken);
+            var player = await GetPlayer(message.From);
+            Console.WriteLine(message.Text);
             var commandResult = new CommandResult();
             foreach (var command in _controllers)
             {
-                if (command.CheckMessage(e.Message, player))
+                if (command.CheckMessage(message, player))
                 {
-                   await command.ProceedMessageAsync(e.Message, player, commandResult);
+                   await command.ProceedMessageAsync(message, player, commandResult);
                 }
             }
-            _db.UpdatePlayer(player);
-            HandleResponse(commandResult, e.Message.From.Id);
+            
+            await _db.UpdatePlayer(player, cancellationToken);
+            await HandleResponse(commandResult, message.From.Id, cancellationToken);
         }
 
-        private async Task HandleResponse(CommandResult commandResult, int chat)
+        private async Task HandleResponse(CommandResult commandResult, long chat, CancellationToken cancellationToken)
         {
             switch (commandResult.Type)
             {
-                 case MessageType.Photo:
-                     if (commandResult.AdditionalData is string)
-                     {
-                         await _client.SendPhotoAsync(chat, new InputOnlineFile((string) commandResult.AdditionalData),
-                             commandResult.Text.ToString(), ParseMode.Html,
-                             replyMarkup: new InlineKeyboardMarkup(commandResult.Buttons.SplitList()));
-                     }
-                     else if (commandResult.AdditionalData is Stream)
-                     {
-                         await _client.SendPhotoAsync(chat, new InputOnlineFile((Stream) commandResult.AdditionalData),
-                             commandResult.Text.ToString(), ParseMode.Html,
-                             replyMarkup: new InlineKeyboardMarkup(commandResult.Buttons.SplitList()));
-                     }
-                     break;
-                 case MessageType.Text:
-                     default:
-                     await _client.SendTextMessageAsync(chat, commandResult.Text.ToString(),
-                         replyMarkup: new InlineKeyboardMarkup(commandResult.Buttons.SplitList()), parseMode: ParseMode.Html);
-                     break;
-                     
+                case MessageType.Photo:
+                    if (commandResult.AdditionalData is string)
+                    {
+                        await _client.SendPhotoAsync(chat, new InputOnlineFile((string) commandResult.AdditionalData),
+                            commandResult.Text.ToString(), ParseMode.Html,
+                            replyMarkup: new InlineKeyboardMarkup(commandResult.Buttons.SplitList()),
+                            cancellationToken: cancellationToken);
+                    }
+                    else if (commandResult.AdditionalData is Stream)
+                    {
+                        await _client.SendPhotoAsync(chat, new InputOnlineFile((Stream) commandResult.AdditionalData),
+                            commandResult.Text.ToString(), ParseMode.Html,
+                            replyMarkup: new InlineKeyboardMarkup(commandResult.Buttons.SplitList()),
+                            cancellationToken: cancellationToken);
+                    }
+
+                    break;
+                case MessageType.Text:
+                default:
+                    await _client.SendTextMessageAsync(chat, commandResult.Text.ToString(),
+                        replyMarkup: new InlineKeyboardMarkup(commandResult.Buttons.SplitList()),
+                        parseMode: ParseMode.Html, cancellationToken: cancellationToken);
+                    break;
+
             }
         }
 
@@ -141,7 +182,7 @@ namespace GameLibrary
         {
             //using (var file = System.IO.File.OpenRead("Photo/lvlup.png"))
             {
-                this._client.SendPhotoAsync(player.Id,
+                _client.SendPhotoAsync(player.Id,
                     new InputMedia(
                         "https://vignette.wikia.nocookie.net/roblox/images/9/9b/Level_Up_Logo.png/revision/latest?cb=20171101220707"),
                     caption: $"LVL UP! Новый уровень - {player.Lvl.ToString()}!");
@@ -150,8 +191,20 @@ namespace GameLibrary
 
         public Server Start()
         {
-            Subscribe();
-            _client.StartReceiving();
+            using var cts = new CancellationTokenSource();
+            
+            var receiverOptions = new ReceiverOptions
+            {
+                // receive all update types
+                AllowedUpdates = Array.Empty<UpdateType>() 
+            };
+            
+            _client.StartReceiving(
+                updateHandler: HandleUpdateAsync,
+                pollingErrorHandler: HandlePollingErrorAsync,
+                receiverOptions: receiverOptions,
+                cancellationToken: cts.Token);
+            
             Console.WriteLine("Started!");
             return this;
         }
