@@ -19,7 +19,7 @@ namespace GameLibrary
         public delegate void LvlUpHandler(Player message);
 
         public event LvlUpHandler OnLvlUp;
-        public Player(int id)
+        public Player(long id)
         {
             Id = id;
             Lvl = 1;
@@ -27,7 +27,7 @@ namespace GameLibrary
             Items.Add(new Item(){ Name = "Quest Item #1"});
         }
 
-        public int Id { get; set; }
+        public long Id { get; set; }
         public int Lvl { get; set; }
         public Inventory<Item> Items { get; set; }
         public double Money { get; set; }

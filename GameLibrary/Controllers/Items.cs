@@ -58,7 +58,8 @@ namespace GameLibrary.Controllers
                 if (player.Lvl <5)
                 {
                     commandResult.Text.AppendLine("Пока нельзя продать. Уничтожить?");
-                    commandResult.Buttons.Add(new InlineKeyboardButton(){ Text = "Уничтожить", CallbackData = $"/item_delete_{id.ToString()}"});
+                    commandResult.Buttons.Add(new InlineKeyboardButton("Уничтожить")
+                        {CallbackData = $"/item_delete_{id.ToString()}"});
                 }
                 else
                 {
@@ -79,13 +80,13 @@ namespace GameLibrary.Controllers
 
             if (id>=0 && player.Items[id].CanBeSold)
             {
-                commandResult.Buttons.Add(new InlineKeyboardButton(){ Text = "Продать", CallbackData =
-                    $"/item_sell_{id.ToString()}"
-                });
+                commandResult.Buttons.Add(new InlineKeyboardButton("Продать")
+                    {CallbackData = $"/item_sell_{id.ToString()}"});
             }
             else if(id>=0)
             {
-                commandResult.Buttons.Add(new InlineKeyboardButton(){ Text = "Уничтожить", CallbackData = $"/item_delete_{id.ToString()}"});
+                commandResult.Buttons.Add(new InlineKeyboardButton("Уничтожить")
+                    {CallbackData = $"/item_delete_{id.ToString()}"});
             }
             else
             {

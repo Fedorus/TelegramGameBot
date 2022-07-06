@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -11,7 +12,7 @@ namespace GameLibrary
         private IMongoCollection<BsonDocument> Logs;
         public Database(string mongoConnectionString)
         {
-            var client = new MongoClient(mongoConnectionString).GetDatabase("Game");
+            var client = new MongoClient(mongoConnectionString).GetDatabase("TelegramBotGame");
             Players = client.GetCollection<Player>("Players");
             Logs = client.GetCollection<BsonDocument>("Logs");
         }
@@ -28,14 +29,14 @@ namespace GameLibrary
             return player;
         }
 
-        public Player UpdatePlayer(Player pl)
+        public async Task<Player> UpdatePlayer(Player pl, CancellationToken cancellationToken = default)
         {
-            return Players.FindOneAndReplace(p=>p.Id == pl.Id, pl);
+            return await Players.FindOneAndReplaceAsync(p=>p.Id == pl.Id, pl, cancellationToken: cancellationToken);
         }
 
-        public void LogMessage(Message mess)
+        public async Task LogMessage(Message mess, CancellationToken cancellationToken = default)
         {
-             Logs.InsertOneAsync(mess.ToBsonDocument());
+             await Logs.InsertOneAsync(mess.ToBsonDocument(), null, cancellationToken);
         }
 
         public void LogMessage(CallbackQuery que)
